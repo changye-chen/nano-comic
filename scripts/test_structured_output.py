@@ -36,15 +36,23 @@ def test_method(model_name: str, method: str) -> tuple[bool, str]:
         (success, error_message)
     """
     try:
+        from langchain_core.messages import HumanMessage, SystemMessage
+
         client = LLMClient(model_name)
         client.structured_output_method = method
 
-        result = client.structured_output(
-            prompt_name="test_structured",
-            output_model=TestOutput,
-            name="张三",
-            age=25,
-        )
+        messages = [
+            SystemMessage(content="你是一个测试助手。"),
+            HumanMessage(content="请生成一个测试输出：名称张三，年龄25岁。"),
+        ]
+
+        llm = client._get_llm()
+        if method == "json_mode":
+            json_instruction = client._build_json_instruction(TestOutput)
+            messages[0].content += json_instruction
+
+        structured_llm = llm.with_structured_output(TestOutput, method=method)
+        result = structured_llm.invoke(messages)
         return True, str(result)
     except Exception as e:
         return False, str(e)

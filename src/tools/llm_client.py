@@ -134,12 +134,7 @@ class LLMClient:
         structured_llm = llm.with_structured_output(
             output_model, method=self.structured_output_method
         )
-        result = structured_llm.invoke(messages)
-
-        if hasattr(output_model, "__name__") and "Beat" in output_model.__name__:
-            result = self._fix_beat_format(result)
-
-        return result
+        return structured_llm.invoke(messages)
 
     # ──────────────────────────────────────
     # 结构化输出的辅助方法
@@ -148,11 +143,91 @@ class LLMClient:
     def _build_json_instruction(self, model: type[BaseModel]) -> str:
         """为 json_mode 构建格式说明，注入到 prompt 中"""
         schema = model.model_json_schema()
+
+        # 生成字段说明
         field_desc = self._schema_to_description(schema)
 
+        # 生成 JSON 结构示例
+        json_example = self._build_json_example(schema)
+
         return (
-            f"\n\n请严格按照以下 JSON Schema 输出，不要输出任何其他内容：\n"
-            f"```\n{field_desc}\n```"
+            f"\n\n请严格按照以下 JSON 格式输出，不要输出任何其他内容：\n"
+            f"```\n{json_example}\n```\n\n"
+            f"字段说明：\n{field_desc}"
+        )
+
+    def _build_json_example(
+        self, schema: dict, defs: dict | None = None, indent: int = 0
+    ) -> str:
+        """
+        根据Schema生成JSON结构示例（带占位符），让模型清楚理解层级关系。
+        """
+        if defs is None:
+            defs = schema.get("$defs", {})
+
+        props = schema.get("properties", {})
+        required = set(schema.get("required", []))
+        lines = []
+        prefix = "  " * indent
+
+        # 处理顶层类型
+        schema_type = schema.get("type", "object")
+
+        if schema_type == "array":
+            items = self._resolve_ref(schema.get("items", {}), defs)
+            item_example = self._build_json_example(items, defs, indent)
+            return f"[\n{prefix}  {item_example.strip()},\n{prefix}  ...\n{prefix}]"
+        elif schema_type == "object" and not props:
+            return "{}"
+
+        for name, info in props.items():
+            info = self._resolve_ref(info, defs)
+            type_str = info.get("type", "object")
+            desc = info.get("description", "")
+            is_required = name in required
+            req_mark = "" if is_required else " (可选)"
+            comma = ","  # 总是加逗号
+
+            # 处理 anyOf（如 Optional 字段）
+            if "anyOf" in info:
+                # 找到非 null 的类型
+                for variant in info["anyOf"]:
+                    variant = self._resolve_ref(variant, defs)
+                    if variant.get("type") != "null":
+                        info = variant
+                        type_str = info.get("type", "object")
+                        break
+
+            if type_str == "object" and "properties" in info:
+                nested = self._build_json_example(info, defs, indent + 1)
+                lines.append(f'{prefix}"{name}": {nested}{comma}')
+            elif type_str == "array":
+                items = self._resolve_ref(info.get("items", {}), defs)
+                if "properties" in items:
+                    # 数组元素是对象
+                    item_example = self._build_json_example(items, defs, indent + 2)
+                    lines.append(
+                        f'{prefix}"{name}": [\n'
+                        f"{prefix}  {item_example.strip()}\n"
+                        f"{prefix}]{comma}"
+                    )
+                else:
+                    item_type = items.get("type", "any")
+                    lines.append(
+                        f'{prefix}"{name}": ["<{item_type}>{req_mark}"]{comma}'
+                    )
+            elif "enum" in info:
+                enum_vals = info["enum"]
+                example_val = enum_vals[0] if enum_vals else "unknown"
+                lines.append(f'{prefix}"{name}": "{example_val}"{comma}{req_mark}')
+            else:
+                placeholder = f"<{type_str}>{req_mark}"
+                lines.append(f'{prefix}"{name}": "{placeholder}"{comma}')
+
+        return (
+            "{\n" + "\n".join(lines) + "\n" + prefix[:-2] + "}"
+            if indent > 0
+            else "{\n" + "\n".join(lines) + "\n}"
         )
 
     def _schema_to_description(
@@ -214,45 +289,10 @@ class LLMClient:
         # allOf 也是 Pydantic 常用的模式（带 description 的嵌套引用）
         if "allOf" in info:
             merged = {}
-            for item in info["allOf"]:
-                if "$ref" in item:
-                    ref_path = item["$ref"]
-                    ref_name = ref_path.split("/")[-1]
-                    if ref_name in defs:
-                        merged.update(defs[ref_name])
-                else:
-                    merged.update(item)
+            for sub in info["allOf"]:
+                merged.update(LLMClient._resolve_ref(sub, defs))
+            # 保留外层的 description
+            if "description" in info:
+                merged["description"] = info["description"]
             return merged
         return info
-
-    @staticmethod
-    def _fix_beat_format(result):
-        """修复模型输出的Beat格式问题"""
-        if not hasattr(result, "beats"):
-            return result
-
-        for beat in result.beats:
-            # 修复 monologue: {id, content} -> {speaker, text}
-            if beat.monologue:
-                if hasattr(beat.monologue, "id"):
-                    beat.monologue.speaker = beat.monologue.id
-                    delattr(beat.monologue, "id")
-                if hasattr(beat.monologue, "content"):
-                    beat.monologue.text = beat.monologue.content
-                    delattr(beat.monologue, "content")
-                # 添加缺失的 intensity
-                if not hasattr(beat.monologue, "intensity"):
-                    beat.monologue.intensity = "medium"
-
-            # 修复 key_dialogue: 单个对象 -> 列表
-            if beat.key_dialogue and not isinstance(beat.key_dialogue, list):
-                beat.key_dialogue = [beat.key_dialogue]
-
-            # 修复 key_dialogue 中的字段名
-            if beat.key_dialogue:
-                for dialogue in beat.key_dialogue:
-                    if hasattr(dialogue, "content"):
-                        dialogue.text = dialogue.content
-                        delattr(dialogue, "content")
-
-        return result

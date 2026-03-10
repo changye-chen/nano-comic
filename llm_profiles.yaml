@@ -25,12 +25,33 @@ models:
       - generate_manga_prompt
     env_key: DEEPSEEK_API_KEY
     env_base_url: DEEPSEEK_BASE_URL
+  gemini-3.1-flash-lite-preview:
+    provider: openai_compatible
+    display_name: "Gemini 3.1 Flash Lite (Yunwu)"
+    description: |
+      通过云雾 API 访问的 Gemini 3.1 Flash Lite 模型。
+      轻量级快速模型，适合需要快速响应的任务。
+      结构化输出能力优于 step-3.5-flash，性价比高。
+    capabilities:
+      - structured_output
+      - fast_response
+      - cost_effective
+    context_window: 1000000
+    cost_tier: low
+    structured_output_method: json_mode
+    recommended_for:
+      - extract_beats
+      - generate_story_board
+      - generate_manga_prompt
+    env_key: YUNWU_API_KEY
+    env_base_url: YUNWU_BASE_URL
   step-3.5-flash:
     provider: openai_compatible
     display_name: "Step 3.5 Flash"
     description: |
       快速响应模型，适用于需要实时处理的任务。
       速度快，成本低，适合对延迟敏感的场景。
+      注意：仅支持 function_calling，不支持 json_mode。结构化能力有待验证。
     capabilities:
       - structured_output
       - super_fast_response
@@ -39,8 +60,6 @@ models:
     cost_tier: low
     structured_output_method: function_calling
     recommended_for:
-      - extract_chapter_meta
-      - split_story_unit
       - extract_beats
       - generate_story_board
       - generate_manga_prompt
