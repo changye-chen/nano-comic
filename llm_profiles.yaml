@@ -1,0 +1,55 @@
+# LLM 模型配置与特性描述
+# Agent 在调用工具前应先阅读此文件，了解可用模型特性
+
+default_model: deepseek-chat
+
+models:
+  deepseek-chat:
+    provider: openai_compatible
+    display_name: "DeepSeek Chat"
+    description: |
+      通用大语言模型，性价比高，擅长结构化输出和推理任务。
+      中文能力强，适合文本分析、信息提取、内容生成等任务。
+    capabilities:
+      - structured_output
+      - chinese_optimized
+      - cost_effective
+    context_window: 200000
+    cost_tier: low
+    structured_output_method: json_mode
+    recommended_for:
+      - extract_chapter_meta
+      - split_story_unit
+      - extract_beats
+      - generate_story_board
+      - generate_manga_prompt
+    env_key: DEEPSEEK_API_KEY
+    env_base_url: DEEPSEEK_BASE_URL
+  step-3.5-flash:
+    provider: openai_compatible
+    display_name: "Step 3.5 Flash"
+    description: |
+      快速响应模型，适用于需要实时处理的任务。
+      速度快，成本低，适合对延迟敏感的场景。
+    capabilities:
+      - structured_output
+      - super_fast_response
+      - cost_effective
+    context_window: 200000
+    cost_tier: low
+    structured_output_method: function_calling
+    recommended_for:
+      - extract_chapter_meta
+      - split_story_unit
+      - extract_beats
+      - generate_story_board
+      - generate_manga_prompt
+    env_key: STEP_FUN_API_KEY
+    env_base_url: STEP_FUN_BASE_URL
+
+tool_defaults:
+  extract_chapter_meta: deepseek-chat
+  split_story_unit: deepseek-chat
+  extract_beats: deepseek-chat
+  generate_story_board: deepseek-chat
+  generate_manga_prompt: deepseek-chat
