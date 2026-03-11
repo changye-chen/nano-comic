@@ -61,17 +61,21 @@ extract_beats(novel, chapter, su)
 generate_story_board(novel, chapter, su)
 ```
 
-**阶段 3: Prompt 级处理（对每个 page 循环）**
+**阶段 3: Prompt 级处理（对每个 page 循环，可并行）**
 ```
 generate_manga_prompt(novel, chapter, su, page)
+↓
+输出: workspace/{novel}/chap_{n}/su_{su}/su_{su}_page_{pg}_prompt.json
 ```
 
-**阶段 4: 图片生成（对每个 page 循环）**
+**阶段 4: 图片生成（对每个 page 串行执行）**
 ```
 generate_image(novel, chapter, su, page)
 ↓
 输出: workspace/{novel}/chap_{n}/su_{su}/images/page_{pg}.png
 ```
+
+> ⚠️ **串行约束**：图片生成必须按页面顺序执行，因为后页需要参考前页保持视觉一致性。
 
 ### 步骤 6: 完成确认
 每个工具返回格式：
@@ -100,20 +104,34 @@ generate_image(novel, chapter, su, page)
 | split_story_unit | novel, chapter | 拆分故事单元，更新 story_units |
 | extract_beats | novel, chapter, su | 提取叙事节拍 |
 | generate_story_board | novel, chapter, su | 生成分镜页面 |
-| generate_manga_prompt | novel, chapter, su, page | 生成绘画提示词 |
-| generate_image | novel, chapter, su, page | 调用 Gemini 生成漫画图片 |
+| generate_manga_prompt | novel, chapter, su, page | 生成绘画提示词，注入摘要上下文 |
+| generate_image | novel, chapter, su, page | 调用 Gemini 生成漫画图片，含前图参考 |
 
 ## 绘图工具说明
 
-`generate_image` 使用 Nano Banana 2 (gemini-3.1-flash-image-preview) 模型：
-- 从 `project.json` 读取风格配置（分辨率、比例等）
-- 从 `su_x_page_y_prompt.json` 读取绘图提示词
-- 从 `characters/` 和 `locations/` 收集参考图片（最多14张）
-- 输出到 `su_x/images/page_y.png`
+### generate_manga_prompt（提示词生成）
 
-**依赖配置**：需在 `.env` 中设置：
-- `GEMINI_API_KEY`：API 密钥（必需）
-- `GEMINI_BASE_URL`：自定义端点（可选）
+注入完整叙事上下文，确保画面与剧情一致：
+- `novel_summary`：小说整体基调
+- `chapter_summary`：章节主旨
+- `previous_su_summaries`：前序剧情摘要
+- `current_su_summary`：当前叙事单元摘要
+
+### generate_image（图片生成）
+
+使用 Nano Banana 2 (gemini-3.1-flash-image-preview) 模型，自动收集参考图：
+
+**参考图来源**：
+1. **前图参考**（最多 2 张）：前序页面图片，保持风格一致性
+   - 同 SU 内：`page_N → page_{N-1}, page_{N-2}`
+   - 跨 SU：`su_2/page_1 → su_1 最后两页`
+2. **资产参考**（最多 14 张）：角色和场景的参考图
+
+**输出文件**：
+- `su_x/images/page_y.png`：漫画图片
+- `su_x/images/page_y_meta.json`：元数据，包含 `reference_images` 列表
+
+**执行约束**：必须按页面顺序串行执行，前图不存在时自动跳过。
 
 ## 约束
 - 按顺序执行，不跳过步骤

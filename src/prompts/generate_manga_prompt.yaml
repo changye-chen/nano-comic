@@ -13,10 +13,26 @@ system: |
   - 强调氛围、光影、张力等视觉要素
   - tension=high时描述粗重墨线、强对比；tension=low时描述柔和细腻
 
-  全局风格指令：
-  {style_directive}
+  全局绘画约束：
+  - 颜色模式：{color_mode_desc}
+  - 色彩氛围：{color_mood_desc}
+  - 线条风格：{line_style_desc}
+  - 漫画文字语言：{text_language_desc}
+  - 风格指令：{style_directive}
 
 user: |
+  ## 小说整体基调
+  {novel_summary}
+
+  ## 章节主旨
+  {chapter_summary}
+
+  ## 前序剧情
+  {previous_su_summaries}
+
+  ## 当前叙事单元摘要
+  {current_su_summary}
+
   ## 分镜脚本
   {page_json}
 

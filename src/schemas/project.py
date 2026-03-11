@@ -4,10 +4,16 @@ from pydantic import BaseModel, Field
 
 
 class ArtStyle(BaseModel):
-    color_mode: Literal["black_and_white", "color"] = Field(
-        description="黑白或彩色"
+    color_mode: Literal["black_and_white", "color"] = Field(description="黑白或彩色")
+    color_mood: Literal["bright", "muted", "dark"] = Field(
+        default="bright",
+        description="色彩氛围：bright=明快鲜艳，muted=低饱和灰调，dark=阴郁深沉",
     )
-    text_language: str = Field(description="漫画文字语言，如 zh/en/ja")
+    line_style: Literal["clean", "bold", "sketchy"] = Field(
+        default="clean",
+        description="线条风格：clean=干净利落，bold=粗犷有力，sketchy=手绘随笔感",
+    )
+    text_language: str = Field(default="zh", description="漫画文字语言，如 zh/en/ja")
     resolution: str = Field(description="输出分辨率，如 1024x1536")
     aspect_ratio: str = Field(description="页面比例，如 2:3")
     file_format: Literal["png", "jpg", "webp"] = Field(description="输出图片格式")

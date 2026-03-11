@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -12,9 +12,7 @@ class PanelCharacter(BaseModel):
 
 
 class PanelDialogue(BaseModel):
-    speaker: str = Field(
-        description="说话者角色ID，群众用 mob，旁白用 narrator"
-    )
+    speaker: str = Field(description="说话者角色ID，群众用 mob，旁白用 narrator")
     text: str = Field(description="台词/旁白文本")
     type: Literal["normal", "shout", "thought", "narration"] = Field(
         description="气泡类型：普通/喊叫/思考/旁白"
@@ -31,7 +29,7 @@ class Panel(BaseModel):
     dialogue: list[PanelDialogue] = Field(
         default_factory=list, description="对白与旁白"
     )
-    sfx: str = Field(default="", description="漫画音效文字，如 哗——、砰！")
+    sfx: Optional[str] = Field(default="", description="漫画音效文字，如 哗——、砰！")
     tension: Literal["low", "medium", "high"] = Field(
         description="画面张力：影响线条粗细/对比度/速度线"
     )
